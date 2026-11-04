@@ -24,3 +24,9 @@ Botón del martillo en la barra del juego → **Editor de luces**.
 
 `tools_base`, `time_base`, `ui_base`, `scenario_tools_base` (lee escenarios; no hace falta la ventana del editor de escenarios).
 El paquete antiguo `editor_tools` instala este mod junto con las demás ventanas de autor.
+
+## Luces en mapas RPG
+
+Con `light_editor` y `rpg_editor` cargados, la integración `rpg_editor__lights` añade **RPG maps** al selector. Elige **Save to mod** y el mapa. Doble clic o **+ Light** crea una fuente sin objeto ni colisión. Arrastra sus marcas; X/Y usan el mapa como base y pueden superar 0–1 para iluminar paredes fuera del suelo. El radio es circular en pantalla, medido en unidades de casilla. Del borra; Ctrl+Z/Y deshace y rehace, un paso por arrastre.
+
+**Night preview** solo cambia la vista. El modo guardado sigue el reloj o fija día/noche; el día fijo satura la luz y oculta la lámpara portátil. Save escribe el mapa propio o un parche `rpg_map`; los mapas de dependencias permanecen intactos. Los IDs estables permiten parches por fuente. Se guardan más de 16 fuentes, pero el renderizador elige las 16 más cercanas. La lámpara de la barra es la misma del juego y conserva su posición, radio e intensidad.

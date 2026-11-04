@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Text.Json;
 using Cthangover.Core.Mods.Resolvers;
@@ -28,6 +29,21 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         /// <summary>Viewport width the stored radii refer to.</summary>
         public const float GameWidth = 1920f;
 
+        /// <summary>Target capacity; backgrounds use their ten shader slots, map adapters choose their renderer's limit.</summary>
+        public int Limit { get; set; } = MaxLights;
+        /// <summary>New source radius in the active target's units.</summary>
+        public float NewRadius { get; set; } = 400f;
+        /// <summary>Assign stable ids for resource-backed light arrays; legacy scenario commands remain unchanged.</summary>
+        public bool UseIds { get; set; }
+        /// <summary>Resource owner prefix prevents independent mods from accidentally creating the same new source id.</summary>
+        public string IdPrefix { get; set; } = "light";
+        /// <summary>Loads a detached resource list without inventing a scenario command.</summary>
+        public void ReplaceLights(List<LightDef> lights, int selection = -1)
+        {
+            Lights = lights ?? new List<LightDef>();
+            Select(selection);
+        }
+
         private const string Command = "light_set";
         private const int ShaderSlots = 11;
         private static readonly Vector2 Offscreen = new(-1000f, -1000f);
@@ -47,10 +63,16 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         /// <summary>Adds a warm light at the given normalised point and selects it; null when all slots are used.</summary>
         public LightDef Add(Vector2 position)
         {
-            if (Lights.Count >= MaxLights)
+            if (Lights.Count >= Limit)
                 return null;
 
-            var light = new LightDef { X = position.X, Y = position.Y, Radius = 400f, Influence = 1f, ColorHex = "#ffcc66" };
+            var light = new LightDef { X = position.X, Y = position.Y, Radius = NewRadius, Influence = 1f, ColorHex = "#ffcc66" };
+            if (UseIds)
+            {
+                var index = 1;
+                while (Lights.Any(item => item.Id == IdPrefix + index)) index++;
+                light.Id = IdPrefix + index;
+            }
             Lights.Add(light);
             SelectedIndex = Lights.Count - 1;
             return light;

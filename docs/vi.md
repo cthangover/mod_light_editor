@@ -24,3 +24,9 @@ Nút búa trên thanh công cụ trong trò chơi → **Trình sửa ánh sáng*
 
 `tools_base`, `time_base`, `ui_base`, `scenario_tools_base` (đọc kịch bản; không cần cửa sổ trình sửa kịch bản).
 Gói cũ `editor_tools` cài mod này cùng các cửa sổ tác giả khác.
+
+## Đèn trên bản đồ RPG
+
+Khi nạp `light_editor` và `rpg_editor`, tích hợp `rpg_editor__lights` thêm **RPG maps**. Chọn mod lưu và bản đồ; nhấp đúp hoặc **+ Light** tạo nguồn không có vật thể hay va chạm. Kéo điểm đánh dấu để di chuyển. X/Y lấy bản đồ làm cơ sở, cho phép ngoài 0–1 để soi tường ngoài sàn. Bán kính tròn trên màn hình, tính bằng đơn vị ô. Del xóa; Ctrl+Z/Y hoàn tác/làm lại, mỗi lần kéo một bước.
+
+**Night preview** chỉ đổi xem trước. Chế độ lưu theo đồng hồ hoặc cố định ngày/đêm; ngày cố định bão hòa ánh sáng và ẩn đèn cầm tay. Save ghi bản đồ riêng hoặc bản vá `rpg_map`, giữ nguyên tệp phụ thuộc. ID ổn định cho phép vá từng đèn. Có thể lưu hơn 16 đèn nhưng bộ dựng chọn 16 đèn gần nhất. Đèn thanh công cụ dùng chung với game, giữ vị trí, bán kính, cường độ.

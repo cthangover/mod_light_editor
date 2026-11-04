@@ -51,6 +51,7 @@ namespace Cthangover.Core.UI.Tool.LightEditor
             BuildUI();
             LoadBackgrounds();
             LoadScenarioList();
+            InstallTargets();
             SetHint(ToolUi.Tr("tools/light_editor/hint"));
         }
 
@@ -63,16 +64,18 @@ namespace Cthangover.Core.UI.Tool.LightEditor
 
             var toolbar = CreateToolbar();
             outer.AddChild(toolbar);
+            BuildTargetPicker(toolbar);
             _scenarioSelect = new OptionButton { CustomMinimumSize = new Vector2(420, 0), TooltipText = ToolUi.Tr("tools/light_editor/scenario_tip") };
             _scenarioSelect.ItemSelected += OnScenarioPicked;
             toolbar.AddChild(_scenarioSelect);
             toolbar.AddChild(ToolUi.Button("tools/common/save", Save, ButtonKind.Primary, "tools/light_editor/save_tip"));
-            toolbar.AddChild(ToolUi.Button("tools/light_editor/copy_line", CopyLine, ButtonKind.Secondary, "tools/light_editor/copy_line_tip"));
+            _copyButton = ToolUi.Button("tools/light_editor/copy_line", CopyLine, ButtonKind.Secondary, "tools/light_editor/copy_line_tip");
+            toolbar.AddChild(_copyButton);
             toolbar.AddChild(UiKit.Spacer());
-            var lineToggle = ToolUi.Button("tools/light_editor/show_line", null, ButtonKind.Tab);
-            lineToggle.ToggleMode = true;
-            lineToggle.Toggled += on => _lineEdit.Visible = on;
-            toolbar.AddChild(lineToggle);
+            _lineToggle = ToolUi.Button("tools/light_editor/show_line", null, ButtonKind.Tab);
+            _lineToggle.ToggleMode = true;
+            _lineToggle.Toggled += on => _lineEdit.Visible = on;
+            toolbar.AddChild(_lineToggle);
 
             var main = new HSplitContainer
             {
@@ -92,13 +95,13 @@ namespace Cthangover.Core.UI.Tool.LightEditor
             };
             main.AddChild(canvasColumn);
 
-            var canvasPanel = new PanelContainer
+            _canvasPanel = new PanelContainer
             {
                 SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
                 SizeFlagsVertical = Control.SizeFlags.ExpandFill
             };
-            canvasPanel.AddThemeStyleboxOverride("panel", UiKit.Frame(UiTokens.RadiusMd, UiTokens.Well, UiTokens.Line));
-            canvasColumn.AddChild(canvasPanel);
+            _canvasPanel.AddThemeStyleboxOverride("panel", UiKit.Frame(UiTokens.RadiusMd, UiTokens.Well, UiTokens.Line));
+            canvasColumn.AddChild(_canvasPanel);
 
             _canvas = new LightEditorCanvas
             {
@@ -107,7 +110,7 @@ namespace Cthangover.Core.UI.Tool.LightEditor
             };
             _canvas.Changed += OnCanvasChanged;
             _canvas.SelectionChanged += RefreshAll;
-            canvasPanel.AddChild(_canvas);
+            _canvasPanel.AddChild(_canvas);
 
             _lineEdit = ToolUi.Code(editable: false);
             _lineEdit.SyntaxHighlighter = ScenarioSyntaxService.CreateHighlighter();
@@ -128,9 +131,11 @@ namespace Cthangover.Core.UI.Tool.LightEditor
             row.AddThemeConstantOverride("separation", UiTokens.Space1);
             column.AddChild(row);
             _addBtn = ToolUi.Button("tools/light_editor/add_light", OnAdd);
+            _addBtn.Name = "AddLight";
             _addBtn.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             row.AddChild(_addBtn);
             _deleteBtn = ToolUi.Button("tools/light_editor/delete", OnDelete, ButtonKind.Danger);
+            _deleteBtn.Name = "DeleteLight";
             _deleteBtn.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             row.AddChild(_deleteBtn);
 
@@ -141,14 +146,20 @@ namespace Cthangover.Core.UI.Tool.LightEditor
             _propsBody.AddThemeConstantOverride("separation", UiTokens.Space2);
             column.AddChild(_propsBody);
 
-            _x = ToolUi.Field(_propsBody, "tools/light_editor/x", ToolUi.Number(0, 1, 0.001, _ => OnFieldsChanged()));
-            _y = ToolUi.Field(_propsBody, "tools/light_editor/y", ToolUi.Number(0, 1, 0.001, _ => OnFieldsChanged()));
-            _radius = ToolUi.Field(_propsBody, "tools/light_editor/radius", ToolUi.Number(10, 3000, 10, _ => OnFieldsChanged()), "tools/light_editor/radius_tip");
-            _influence = ToolUi.Field(_propsBody, "tools/light_editor/influence", ToolUi.Number(0, 1, 0.05, _ => OnFieldsChanged()), "tools/light_editor/influence_tip");
+            _x = ToolUi.Field(_propsBody, "tools/light_editor/x", ToolUi.Number(0, 1, 0.001, _ => OnFieldsChanged("x")));
+            _x.Name = "LightX";
+            _y = ToolUi.Field(_propsBody, "tools/light_editor/y", ToolUi.Number(0, 1, 0.001, _ => OnFieldsChanged("y")));
+            _y.Name = "LightY";
+            _radius = ToolUi.Field(_propsBody, "tools/light_editor/radius", ToolUi.Number(10, 3000, 10, _ => OnFieldsChanged("radius")), "tools/light_editor/radius_tip");
+            _radius.Name = "LightRadius";
+            _influence = ToolUi.Field(_propsBody, "tools/light_editor/influence", ToolUi.Number(0, 1, 0.05, _ => OnFieldsChanged("influence")), "tools/light_editor/influence_tip");
+            _influence.Name = "LightInfluence";
             _color = ToolUi.Field(_propsBody, "tools/light_editor/color", new ColorPickerButton { CustomMinimumSize = new Vector2(0, 28), EditAlpha = false });
-            _color.ColorChanged += _ => OnFieldsChanged();
+            _color.Name = "LightColor";
+            _color.ColorChanged += _ => OnFieldsChanged("color");
 
-            column.AddChild(ToolUi.Section("tools/light_editor/background"));
+            _backgroundTitle = ToolUi.Section("tools/light_editor/background");
+            column.AddChild(_backgroundTitle);
             _bgList = new FilteredList(180);
             _bgList.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
             _bgList.Chosen += ShowBackground;
@@ -257,6 +268,14 @@ namespace Cthangover.Core.UI.Tool.LightEditor
 
         private void Save()
         {
+            if (_target != null)
+            {
+                _target.Commit();
+                if (!_target.Save(out var error)) { SetStatus(error, ToolStatusKind.Error); return; }
+                MarkClean();
+                SetStatus(ToolUi.Tr("tools/light_editor/target_saved"), ToolStatusKind.Ok);
+                return;
+            }
             if (_scenario == null)
             {
                 SetStatus(ToolUi.Tr("tools/light_editor/pick_scenario"), ToolStatusKind.Error);
@@ -277,8 +296,8 @@ namespace Cthangover.Core.UI.Tool.LightEditor
 
         private void CopyLine()
         {
-            DisplayServer.ClipboardSet(_controller.ToScenarioLine());
-            SetStatus(ToolUi.Tr("tools/light_editor/copied"), ToolStatusKind.Ok);
+            DisplayServer.ClipboardSet(CurrentSourceText());
+            SetStatus(ToolUi.Tr(_target == null ? "tools/light_editor/copied" : "tools/light_editor/data_copied"), ToolStatusKind.Ok);
         }
 
         // ── editing ────────────────────────────────────────────────
@@ -287,10 +306,11 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         {
             if (_controller.Add(new Vector2(0.5f, 0.5f)) == null)
             {
-                SetStatus(string.Format(ToolUi.Tr("tools/light_editor/limit"), LightEditorController.MaxLights), ToolStatusKind.Error);
+                SetStatus(string.Format(ToolUi.Tr("tools/light_editor/limit"), _controller.Limit), ToolStatusKind.Error);
                 return;
             }
 
+            _target?.Commit();
             SetDirty();
             RefreshAll();
         }
@@ -301,6 +321,7 @@ namespace Cthangover.Core.UI.Tool.LightEditor
                 return;
 
             _controller.RemoveSelected();
+            _target?.Commit();
             SetDirty();
             RefreshAll();
         }
@@ -308,37 +329,41 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         /// <summary>Delete removes the selected light.</summary>
         protected override bool HandleKey(InputEventKey key)
         {
+            if (_target?.HandleKey(key) == true) { RefreshAll(); SyncTargetDirty(); return true; }
             if (key.Keycode != Key.Delete || _controller.Selected == null)
                 return false;
             OnDelete();
             return true;
         }
 
-        private void OnFieldsChanged()
+        private void OnFieldsChanged(string field)
         {
             var light = _controller.Selected;
             if (_suppress || light == null)
                 return;
 
-            light.X = (float)_x.Value;
-            light.Y = (float)_y.Value;
-            light.Radius = (float)_radius.Value;
-            light.Influence = (float)_influence.Value;
-            light.ColorHex = "#" + _color.Color.ToHtml(false);
+            if (field == "x") light.X = (float)_x.Value;
+            if (field == "y") light.Y = (float)_y.Value;
+            if (field == "radius") light.Radius = (float)_radius.Value;
+            if (field == "influence") light.Influence = (float)_influence.Value;
+            if (field == "color") light.ColorHex = "#" + _color.Color.ToHtml(light.ColorHex?.Length == 9);
+            _target?.Commit();
             SetDirty();
             RefreshList();
-            _lineEdit.Text = _controller.ToScenarioLine();
-            _canvas.RebuildHandles();
+            _lineEdit.Text = CurrentSourceText();
+            RefreshCanvas();
         }
 
         private void OnCanvasChanged()
         {
-            SetDirty();
+            _target?.Commit();
+            if (_target != null) { RefreshAll(); SyncTargetDirty(); return; }
+            SyncTargetDirty();
             _suppress = true;
             WriteProperties();
             _suppress = false;
             RefreshList();
-            _lineEdit.Text = _controller.ToScenarioLine();
+            _lineEdit.Text = CurrentSourceText();
         }
 
         // ── refresh ────────────────────────────────────────────────
@@ -349,10 +374,10 @@ namespace Cthangover.Core.UI.Tool.LightEditor
             _suppress = true;
             WriteProperties();
             _suppress = false;
-            _lineEdit.Text = _controller.ToScenarioLine();
-            _addBtn.Disabled = _controller.Lights.Count >= LightEditorController.MaxLights;
+            _lineEdit.Text = CurrentSourceText();
+            _addBtn.Disabled = _controller.Lights.Count >= _controller.Limit;
             _deleteBtn.Disabled = _controller.Selected == null;
-            _canvas.RebuildHandles();
+            RefreshCanvas();
         }
 
         private void RefreshList()
@@ -361,7 +386,7 @@ namespace Cthangover.Core.UI.Tool.LightEditor
             for (var i = 0; i < _controller.Lights.Count; i++)
             {
                 var light = _controller.Lights[i];
-                var index = _lightList.AddItem($"●  {i + 1}.  {light.X:0.000}, {light.Y:0.000}   r {light.Radius:0}");
+                var index = _lightList.AddItem($"●  {i + 1}.  {light.X:0.000}, {light.Y:0.000}   r {light.Radius:0.##}");
                 _lightList.SetItemCustomFgColor(index, light.ToColor());
             }
 
