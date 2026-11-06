@@ -25,8 +25,12 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         string HintKey { get; }
         /// <summary>The resource data shown by the source panel and copied to the clipboard.</summary>
         string SourceText { get; }
+        /// <summary>Opaque text naming the opened resource, or null when nothing is open; the window keeps it across a mod reload.</summary>
+        string Location { get; }
         /// <summary>Initializes a document and configures the shared controller; called before attaching View.</summary>
         void Open(LightEditorController controller);
+        /// <summary>Opens the resource named by an earlier Location; does nothing when it no longer exists.</summary>
+        void Reopen(string location);
         /// <summary>Commits the shared light list through the resource document's history.</summary>
         void Commit();
         /// <summary>Re-presents the target using the controller's current values.</summary>

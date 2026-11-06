@@ -18,6 +18,8 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         private string _targetId;
         private readonly List<ILightEditorTargetProvider> _providers = new();
         private int _pendingTarget;
+        private string _resumeId;
+        private string _resumeLocation;
         /// <summary>The active optional surface adapter, or null for ordinary dialog backgrounds.</summary>
         public ILightEditorTarget ActiveTarget => _target;
         /// <summary>The shared light editing session for the current target.</summary>
@@ -30,13 +32,21 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         }
         private void InstallTargets()
         {
-            _targetSelect.AddItem(ToolUi.Tr("tools/light_editor/background_target"));
             _providers.AddRange(LightEditorTargets.All);
-            foreach (var provider in _providers) _targetSelect.AddItem(ToolUi.Tr(provider.LocaleKey));
+            FillTargetPicker();
             LightEditorTargets.Removing += OnTargetRemoving;
+            LightEditorTargets.Added += OnTargetAdded;
+        }
+        private void FillTargetPicker()
+        {
+            _targetSelect.Clear();
+            _targetSelect.AddItem(ToolUi.Tr("tools/light_editor/background_target"));
+            foreach (var provider in _providers) _targetSelect.AddItem(ToolUi.Tr(provider.LocaleKey));
         }
         private void OnTargetPicked(long index)
         {
+            _resumeId = null;
+            _resumeLocation = null;
             _pendingTarget = (int)index;
             RunDiscardingChanges(ApplyTarget, RestoreTargetSelection);
         }
@@ -46,6 +56,7 @@ namespace Cthangover.Core.UI.Tool.LightEditor
             _targetSelect.Select(_target == null ? 0 : index + 1);
         }
         private bool IsActiveProvider(ILightEditorTargetProvider provider) => provider.Id == _targetId;
+        private bool IsResumeProvider(ILightEditorTargetProvider provider) => provider.Id == _resumeId;
         private void ApplyTarget()
         {
             _suppress = true;
@@ -122,16 +133,45 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         }
         private void OnTargetRemoving(string id)
         {
-            if (_targetId == id) { _pendingTarget = 0; ApplyTarget(); }
+            if (_targetId == id)
+            {
+                _resumeId = id;
+                _resumeLocation = _target.Location;
+                _pendingTarget = 0;
+                ApplyTarget();
+            }
             _providers.RemoveAll(provider => provider.Id == id);
-            _targetSelect.Clear();
-            _targetSelect.AddItem(ToolUi.Tr("tools/light_editor/background_target"));
-            foreach (var provider in _providers) _targetSelect.AddItem(ToolUi.Tr(provider.LocaleKey));
+            FillTargetPicker();
+            RestoreTargetSelection();
+        }
+        private void OnTargetAdded(string id)
+        {
+            _providers.Clear();
+            _providers.AddRange(LightEditorTargets.All);
+            FillTargetPicker();
+            RestoreTargetSelection();
+            // Deferred: the registry fires inside the mod reload pipeline, where the new target must not be opened yet.
+            if (_resumeId == id && _target == null) Callable.From(ResumeTarget).CallDeferred();
+        }
+        private void ResumeTarget()
+        {
+            if (!GodotObject.IsInstanceValid(this) || _resumeId == null || _target != null) return;
+            var index = _providers.FindIndex(IsResumeProvider);
+            if (index < 0) return;
+            var location = _resumeLocation;
+            _resumeId = null;
+            _resumeLocation = null;
+            _pendingTarget = index + 1;
+            ApplyTarget();
+            _target?.Reopen(location);
+            RestoreTargetSelection();
+            RefreshAll();
         }
         /// <summary>Releases the adapter before either the editor or its supplying mod unloads.</summary>
         protected override void Cleanup()
         {
             LightEditorTargets.Removing -= OnTargetRemoving;
+            LightEditorTargets.Added -= OnTargetAdded;
             DropTarget();
             _providers.Clear();
             base.Cleanup();

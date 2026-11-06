@@ -10,6 +10,8 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         private static readonly Dictionary<string, ILightEditorTargetProvider> providers = new(StringComparer.Ordinal);
         /// <summary>Allows open windows to release an adapter while its owner is still callable.</summary>
         public static event Action<string> Removing;
+        /// <summary>Raised after a provider registers, so open windows can list it again after a mod reload.</summary>
+        public static event Action<string> Added;
         /// <summary>Current providers, without a persistent cache across games.</summary>
         public static IReadOnlyList<ILightEditorTargetProvider> All => providers.Values.OrderBy(ItemId).ToArray();
         private static string ItemId(ILightEditorTargetProvider provider) => provider.Id;
@@ -18,6 +20,7 @@ namespace Cthangover.Core.UI.Tool.LightEditor
         {
             if (provider == null || string.IsNullOrWhiteSpace(provider.Id) || !providers.TryAdd(provider.Id, provider))
                 throw new InvalidOperationException("Duplicate or invalid light editor target.");
+            Added?.Invoke(provider.Id);
         }
         /// <summary>Removes only the provider instance owned by the unloading mod.</summary>
         public static void Unregister(ILightEditorTargetProvider provider)
