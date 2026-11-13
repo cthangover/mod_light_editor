@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "author": "ct",
   "description": "Edit scene lights and their placement on backgrounds.",
-  "category": "tools, editor",
+  "categories": ["tools", "editor"],
   "sources": [
     "src/**/*.cs"
   ],
